@@ -3,78 +3,92 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>MindAR Image Tracking — Tiramisu</title>
+  <title>MindAR — Tiramisu (solo MindAR)</title>
   <style>
-    body, html { margin: 0; height: 100%; font-family: system-ui, Arial; background: #111; color: #eee; }
-    #ar-container { width: 100%; height: 100vh; display: block; }
-    .controls { position: absolute; left: 16px; top: 16px; z-index: 10; }
-    button { padding: 8px 12px; margin-right: 8px; border-radius: 8px; border: none; background: #0b84ff; color: white; cursor: pointer; }
-    .info { position: absolute; left: 16px; bottom: 16px; z-index: 10; background: rgba(0,0,0,0.4); padding: 8px 12px; border-radius: 6px; }
+    html,body { height:100%; margin:0; background:#111; color:#eee; font-family:system-ui, Arial; }
+    #ar-container { width:100%; height:100vh; position:relative; overflow:hidden; }
+    .ui { position:absolute; left:16px; top:16px; z-index:20; display:flex; gap:8px; }
+    button { padding:8px 12px; border-radius:8px; border:none; background:#0b84ff; color:white; cursor:pointer; }
+    .info { position:absolute; left:16px; bottom:16px; z-index:20; background:rgba(0,0,0,0.45); padding:8px 12px; border-radius:8px; }
+    .hint { position:absolute; right:16px; top:16px; z-index:20; background:rgba(0,0,0,0.45); padding:8px 12px; border-radius:8px; }
   </style>
 </head>
 <body>
 
 <!--
-  Este archivo combina:
-  - MindAR (image tracking) + Three.js para colocar el GLB sobre una imagen objetivo
-  - model-viewer como fallback / botón "Ver en AR" para iOS (Quick Look) usando el archivo USDZ
-
-  Requisitos en el proyecto:
-  - Archivo de target de MindAR (por ejemplo: targets.mind) generado con la herramienta de MindAR
-  - Modelos: modelos/tiramisu.glb y modelos/tiramisu.usdz
-  - Servir vía HTTPS (o localhost) para AR y WebXR
+  Archivo: MindAR-only-tiramisu.html
+  Propósito: Web que usa SOLO MindAR (image tracking) + Three.js para mostrar 'modelos/tiramisu.glb'
+  Requisitos:
+   - targets.mind (archivo de target generado con MindAR target creator)
+   - modelos/tiramisu.glb
+   - Servir vía HTTPS o localhost
 -->
 
-<div class="controls">
-  <button id="startBtn">Iniciar AR (Web)</button>
-  <button id="stopBtn" disabled>Detener AR</button>
-  <!-- En iOS, este enlace abrirá Quick Look con el .usdz -->
-  
-</div>
-
 <div id="ar-container"></div>
-<div class="info">Apunta la cámara a la imagen objetivo para ver el modelo.</div>
+<div class="ui">
+  <button id="startBtn">Iniciar AR</button>
+  <button id="stopBtn" disabled>Detener AR</button>
+</div>
+<div class="hint">Apunta la cámara a la imagen objetivo</div>
+<div class="info">Si tu navegador no soporta cámara/AR verás un mensaje.</div>
 
 <script type="module">
   import * as THREE from 'https://unpkg.com/three@0.150.1/build/three.module.js';
   import { GLTFLoader } from 'https://unpkg.com/three@0.150.1/examples/jsm/loaders/GLTFLoader.js';
   import { MindARThree } from 'https://cdn.jsdelivr.net/npm/mind-ar@1.1.5/dist/mindar-image-three.prod.js';
 
-  // Crear instancia MindAR
+  // Elementos UI
+  const startBtn = document.getElementById('startBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  const info = document.querySelector('.info');
+
+  // Crear MindARThree
   const mindarThree = new MindARThree({
     container: document.querySelector('#ar-container'),
-    imageTargetSrc: 'targets.mind', // <-- coloca tu archivo .mind aquí
+    imageTargetSrc: 'targets.mind', // <-- coloca aquí tu archivo .mind
+    maxTrack: 1,
     uiScanning: true,
-    uiLoading: true,
-    maxTrack: 1 // cuántas imágenes al mismo tiempo (0=infinito)
+    uiLoading: true
   });
 
   const { renderer, scene, camera } = mindarThree;
 
-  // Cargar GLB y anclarlo a la primera imagen target (index 0)
+  // Añadir un anchor para la primera imagen objetivo
   const anchor = mindarThree.addAnchor(0);
+
+  // Cargar GLB
   const loader = new GLTFLoader();
+  let mixer = null;
 
   loader.load('modelos/tiramisu.glb', (gltf) => {
     const model = gltf.scene;
-    // Escala y posición pueden necesitar ajuste según tu objetivo
-    model.scale.set(0.5, 0.5, 0.5);
+    // Ajustes por defecto (puedes modificar según tu modelo)
+    model.scale.set(0.7, 0.7, 0.7);
     model.position.set(0, 0, 0);
-    anchor.group.add(model);
-  }, (xhr) => {
-    // progreso opcional
-    // console.log((xhr.loaded / xhr.total * 100) + '% loaded');
-  }, (err) => {
-    console.error('Error cargando GLB', err);
-  });
+    model.rotation.set(0, 0, 0);
 
-  // Opcional: animaciones
-  let mixer = null;
-  loader.load('modelos/tiramisu.glb', (gltf) => {
+    // Centrar modelo si es necesario
+    const box = new THREE.Box3().setFromObject(model);
+    const size = new THREE.Vector3(); box.getSize(size);
+    if (size.y > 0) {
+      const scaleFactor = 1 / size.y; // normalizar por altura
+      model.scale.multiplyScalar(scaleFactor * 0.5);
+    }
+
+    anchor.group.add(model);
+
+    // Animaciones (si existen)
     if (gltf.animations && gltf.animations.length) {
-      mixer = new THREE.AnimationMixer(gltf.scene);
+      mixer = new THREE.AnimationMixer(model);
       gltf.animations.forEach((clip) => mixer.clipAction(clip).play());
     }
+
+  }, (xhr) => {
+    // progreso opcional
+    // info.textContent = `Cargando modelo: ${Math.round(xhr.loaded / xhr.total * 100)}%`;
+  }, (err) => {
+    console.error('Error cargando GLB:', err);
+    info.textContent = 'Error cargando el modelo. Revisa la ruta modelos/tiramisu.glb';
   });
 
   // Loop de render
@@ -85,18 +99,17 @@
     renderer.render(scene, camera);
   });
 
-  // Control botones
-  const startBtn = document.getElementById('startBtn');
-  const stopBtn = document.getElementById('stopBtn');
-
+  // Botones
   startBtn.addEventListener('click', async () => {
     try {
       await mindarThree.start();
       startBtn.disabled = true;
       stopBtn.disabled = false;
+      info.textContent = 'AR activo — apunta a la imagen objetivo.';
     } catch (err) {
-      console.error('No se pudo iniciar MindAR', err);
-      alert('No se pudo iniciar AR. Asegúrate de usar HTTPS y un navegador compatible con WebXR.');
+      console.error('No se pudo iniciar MindAR:', err);
+      info.textContent = 'No se pudo acceder a la cámara o el navegador no lo permite.';
+      alert('No se pudo iniciar AR. Asegúrate de usar HTTPS y dar permiso a la cámara.');
     }
   });
 
@@ -104,21 +117,21 @@
     await mindarThree.stop();
     startBtn.disabled = false;
     stopBtn.disabled = true;
+    info.textContent = 'AR detenido.';
   });
 
-  // Limpieza al salir
+  // Mensaje si el dispositivo no soporta getUserMedia
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    info.textContent = 'Tu navegador no soporta cámara (getUserMedia). Prueba con Chrome o Safari recientes.';
+    startBtn.disabled = true;
+  }
+
+  // Limpieza
   window.addEventListener('beforeunload', async () => {
     try { await mindarThree.stop(); } catch(e){}
   });
 
 </script>
-
-<!-- model-viewer para fallback / Quick Look (iOS) si quieres ofrecer un botón dentro de la UI web -->
-<script type="module" src="https://unpkg.com/@google/model-viewer@1.12.0/dist/model-viewer.min.js"></script>
-<!-- Puedes insertar un <model-viewer> oculto o visible para pruebas: -->
-<!--
-<model-viewer src="modelos/tiramisu.glb" ios-src="modelos/tiramisu.usdz" alt="Tiramisu" ar ar-modes="webxr scene-viewer quick-look" style="width:320px; height:240px"></model-viewer>
--->
 
 </body>
 </html>
