@@ -1,22 +1,41 @@
 <!DOCTYPE html>
-<html lang="en">
-
-<head>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/dist/mindar-image.prod.js"></script>
+    <title>MindAR Ejemplo Simple</title>
+
+    <!-- Librerías necesarias -->
     <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v7.0.0/dist/aframe-extras.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/dist/mindar-image.prod.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-</head>
 
-<body>
-    <a-scene mindar-image="imageTargetSrc: ./targets.mind;" vr-mode-ui="enabled: false"
-        device-orientation-permission-ui="enabled: false">
-        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-        <a-entity mindar-image-target="targetIndex: 0">
-            <a-plane color="blue" opaciy="0.5" position="0 0 0" height="0.552" width="1" rotation="0 0 0"></a-plane>
-        </a-entity>
+    <style>
+      body { margin: 0; overflow: hidden; }
+      a-scene { position: fixed; top: 0; left: 0; width: 100%; height: 100%; }
+    </style>
+  </head>
+
+  <body>
+    <!-- Escena de realidad aumentada -->
+    <a-scene
+      mindar-image="imageTargetSrc: ./targets.mind;"
+      vr-mode-ui="enabled: false"
+      device-orientation-permission-ui="enabled: true"
+      embedded
+      color-space="sRGB"
+      renderer="colorManagement: true, physicallyCorrectLights"
+    >
+      <a-assets>
+        <!-- Aquí puedes precargar modelos o imágenes -->
+      </a-assets>
+
+      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+      <!-- Objeto que aparecerá cuando detecte la imagen -->
+      <a-entity mindar-image-target="targetIndex: 0">
+        <a-plane color="blue" opacity="0.5" position="0 0 0" height="0.552" width="1"></a-plane>
+      </a-entity>
     </a-scene>
-</body>
-
+  </body>
 </html>
